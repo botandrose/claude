@@ -87,6 +87,35 @@ for BRANCH in $(git for-each-ref --format='%(refname:short)' refs/heads/ | grep 
     continue
   fi
 
+  # Check new file coverage - do files introduced by branch exist in main?
+  MERGE_BASE=$(git merge-base "$MAIN" "$BRANCH" 2>/dev/null || echo "")
+  if [ -n "$MERGE_BASE" ]; then
+    NEW_FILES=$(git diff --name-only --diff-filter=A "$MERGE_BASE..$BRANCH" 2>/dev/null)
+    NEW_FILES_COUNT=0
+    NEW_FILES_IN_MAIN=0
+
+    if [ -n "$NEW_FILES" ]; then
+      while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        NEW_FILES_COUNT=$((NEW_FILES_COUNT + 1))
+        if git show "$MAIN":"$file" &>/dev/null; then
+          NEW_FILES_IN_MAIN=$((NEW_FILES_IN_MAIN + 1))
+        fi
+      done <<< "$NEW_FILES"
+    fi
+
+    if [ "$NEW_FILES_COUNT" -gt 0 ]; then
+      FILE_COVERAGE=$((NEW_FILES_IN_MAIN * 100 / NEW_FILES_COUNT))
+      if [ "$FILE_COVERAGE" -ge 80 ]; then
+        printf "%-50s %-10s %s\n" "$BRANCH" "2-MAYBE" "$FILE_COVERAGE% new files in $MAIN"
+        continue
+      elif [ "$FILE_COVERAGE" -ge 50 ]; then
+        printf "%-50s %-10s %s\n" "$BRANCH" "2-MAYBE" "$FILE_COVERAGE% new files in $MAIN"
+        continue
+      fi
+    fi
+  fi
+
   # Get age for context
   AGE=$(git log "$BRANCH" -1 --format="%ar" 2>/dev/null || echo "unknown")
   printf "%-50s %-10s %s\n" "$BRANCH" "3-KEEP" "$UNIQUE_COUNT unique commits ($AGE)"
