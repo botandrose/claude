@@ -136,6 +136,38 @@ else
 fi
 echo ""
 
+# New file coverage analysis - do files introduced by branch exist in main?
+echo "--- New File Coverage ---"
+MERGE_BASE=$(git merge-base "$MAIN" "$BRANCH")
+NEW_FILES=$(git diff --name-only --diff-filter=A "$MERGE_BASE..$BRANCH" 2>/dev/null)
+NEW_FILES_COUNT=0
+NEW_FILES_IN_MAIN=0
+
+if [ -n "$NEW_FILES" ]; then
+  while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    NEW_FILES_COUNT=$((NEW_FILES_COUNT + 1))
+    if git show "$MAIN":"$file" &>/dev/null; then
+      NEW_FILES_IN_MAIN=$((NEW_FILES_IN_MAIN + 1))
+    fi
+  done <<< "$NEW_FILES"
+fi
+
+if [ "$NEW_FILES_COUNT" -eq 0 ]; then
+  echo "(branch introduced no new files)"
+  FILE_COVERAGE=0
+else
+  FILE_COVERAGE=$((NEW_FILES_IN_MAIN * 100 / NEW_FILES_COUNT))
+  echo "Branch introduced $NEW_FILES_COUNT new files"
+  echo "$NEW_FILES_IN_MAIN of $NEW_FILES_COUNT ($FILE_COVERAGE%) now exist in $MAIN"
+
+  if [ "$FILE_COVERAGE" -ge 80 ]; then
+    echo "-> HIGH COVERAGE: Most new files from this branch exist in $MAIN"
+    echo "   This suggests the feature was completed via a different path"
+  fi
+fi
+echo ""
+
 # Make verdict
 echo "=== VERDICT ==="
 
@@ -143,6 +175,15 @@ echo "=== VERDICT ==="
 if [ "$NO_DIFF" = true ]; then
   echo "Category: 1 (SAFE TO DELETE)"
   echo "Reason: No actual differences from $MAIN"
+  exit 0
+fi
+
+# Category 2: High file coverage - feature was completed differently
+if [ "$FILE_COVERAGE" -ge 80 ] && [ "$NEW_FILES_COUNT" -gt 0 ]; then
+  echo "Category: 2 (PROBABLY SAFE TO DELETE)"
+  echo "Reason: $FILE_COVERAGE% of new files introduced by this branch now exist in $MAIN"
+  echo "        The feature was likely completed via squash/rebase with different commits."
+  echo "Review: The diff shows implementation differences, not missing functionality"
   exit 0
 fi
 
@@ -169,7 +210,19 @@ if [ "$EQUIVALENT_COUNT" -gt 0 ]; then
   exit 0
 fi
 
+# Category 2: Moderate file coverage - most functionality merged
+if [ "$FILE_COVERAGE" -ge 50 ] && [ "$NEW_FILES_COUNT" -gt 0 ]; then
+  echo "Category: 2 (PROBABLY SAFE TO DELETE)"
+  echo "Reason: $FILE_COVERAGE% of new files from branch exist in $MAIN"
+  echo "        Significant overlap suggests feature was partially/fully merged differently"
+  echo "Review: Check if remaining unique files represent valuable incomplete work"
+  exit 0
+fi
+
 # Category 3: Unique work
 echo "Category: 3 (KEEP - NOT SAFE TO DELETE)"
 echo "Reason: Contains $UNIQUE_CHERRY_COUNT unique commits with no equivalents in $MAIN"
+if [ "$NEW_FILES_COUNT" -gt 0 ] && [ "$FILE_COVERAGE" -lt 50 ]; then
+  echo "        Only $FILE_COVERAGE% of new files exist in $MAIN - work appears unmerged"
+fi
 echo "The branch appears to contain unmerged work that would be lost if deleted"
