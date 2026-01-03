@@ -133,4 +133,8 @@ for BRANCH in $(git for-each-ref --format='%(refname:short)' refs/remotes/ | gre
 done
 
 echo ""
-echo "Note: 2-MAYBE branches need deeper analysis. Run: branch-review analyze <branch>"
+echo "Notes:"
+echo "  - When deleting branches, remove both local AND remote:"
+echo "      git branch -d <branch>                  # delete local"
+echo "      git push origin --delete <branch>       # delete remote"
+echo "  - 2-MAYBE branches need deeper analysis: branch-review analyze <branch>"
