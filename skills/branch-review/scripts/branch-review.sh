@@ -43,6 +43,10 @@ Commands:
   safe
     Quick list of branches that are definitely safe to delete (category 1).
 
+  spawn <branch1> [branch2] ...
+    Open new wezterm tabs with Claude Code sessions for each branch.
+    Each tab runs: claude "/wt <branch>"
+
 Categories:
   1 - Safe to delete: Branch is subset of $MAIN_BRANCH or was rebased/merged
   2 - Probably safe: Work appears to have been merged via different commits
@@ -70,6 +74,10 @@ case "$COMMAND" in
   safe)
     shift
     "$SCRIPT_DIR/lib/safe-branches.sh" "$@"
+    ;;
+  spawn)
+    shift
+    "$SCRIPT_DIR/lib/spawn-sessions.sh" "$@"
     ;;
   help|--help|-h)
     show_help
