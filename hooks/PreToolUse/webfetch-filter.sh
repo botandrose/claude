@@ -13,10 +13,18 @@ TOOL_NAME=$(echo "$HOOK_DATA" | jq -r '.tool_name // ""' 2>/dev/null)
 # Extract the URL
 FETCH_URL=$(echo "$HOOK_DATA" | jq -r '.tool_input.url // ""' 2>/dev/null)
 
-# Block if URL contains query parameters
+# Prompt for approval if URL contains query parameters
 if [[ "$FETCH_URL" == *"?"* ]]; then
-    echo "WebFetch URL contains query parameters: $FETCH_URL"
-    exit 2
+    cat <<EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "ask",
+    "permissionDecisionReason": "URL contains query parameters: $FETCH_URL"
+  }
+}
+EOF
+    exit 0
 fi
 
 exit 0
