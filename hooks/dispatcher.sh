@@ -15,5 +15,12 @@ HOOK_DATA=$(cat)
 # Run all .sh files in the hook directory
 for script in "$HOOK_DIR"/*.sh; do
     [[ -x "$script" ]] || continue
-    echo "$HOOK_DATA" | "$script" "$HOOK_NAME"
+    OUTPUT=$(echo "$HOOK_DATA" | "$script" "$HOOK_NAME")
+    EXIT_CODE=$?
+    # Always output if there's content (needed for JSON control responses)
+    [[ -n "$OUTPUT" ]] && echo "$OUTPUT"
+    # Exit on non-zero
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        exit $EXIT_CODE
+    fi
 done
