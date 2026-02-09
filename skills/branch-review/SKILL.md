@@ -2,6 +2,7 @@
 name: branch-review
 description: Analyze git branches to determine if they can be safely deleted. Categorizes branches as safe to delete (merged/subset), probably safe (superseded by rebased work), or keep (active unmerged work).
 user-invocable: true
+allowed-tools: Bash(*)
 ---
 
 # Branch Review Skill
@@ -42,13 +43,10 @@ branch-review.sh analyze <branch-name>
 ### List All Branches with Categories
 
 ```bash
-branch-review.sh list [--remote]
+branch-review.sh list
 ```
 
-**Parameters:**
-- `--remote` (optional) - Include remote branches
-
-**Returns:** Table of all branches with their category and a brief reason
+**Returns:** Table of all branches (local and remote) with their category and a brief reason
 
 ### Show Safe-to-Delete Branches
 
@@ -133,3 +131,4 @@ REASON: All commits have equivalents in main. Branch was rebased and merged.
 
 - Must be run from within a git repository
 - Assumes main branch is named `main` or `master` (auto-detected)
+- Always analyzes both local and remote branches (runs `git fetch` first)

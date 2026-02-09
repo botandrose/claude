@@ -4,10 +4,8 @@
 
 set -e
 
-INCLUDE_REMOTE=false
-if [ "$1" = "--remote" ]; then
-  INCLUDE_REMOTE=true
-fi
+# Fetch latest remote state
+git fetch --prune --quiet 2>/dev/null || true
 
 # Detect main branch
 if git show-ref --verify --quiet refs/heads/main; then

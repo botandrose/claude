@@ -27,7 +27,7 @@ Branch Review - Analyze git branches for safe deletion
 
 Usage:
   branch-review analyze <branch>    Analyze a specific branch
-  branch-review list [--remote]     List all branches with categories
+  branch-review list                List all branches with categories
   branch-review safe                Show branches safe to delete
 
 Commands:
@@ -36,9 +36,9 @@ Commands:
     Perform detailed analysis of a branch to determine deletion safety.
     Returns category (1=safe, 2=probably safe, 3=keep) with reasoning.
 
-  list [--remote]
-    List all local branches with their deletion category.
-    Use --remote to include remote-tracking branches.
+  list
+    List all branches (local and remote) with their deletion category.
+    Runs git fetch first to ensure remote branches are up to date.
 
   safe
     Quick list of branches that are definitely safe to delete (category 1).
