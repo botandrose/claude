@@ -95,29 +95,38 @@ Create a git worktree and switch to it for isolated parallel development.
 
 When the user says they're done with a worktree and want to merge/deploy:
 
-1. **Read `tmp/.test_env`** to get the TEST_ENV_NUMBER:
+1. **CRITICAL: Check for uncommitted changes first**:
+   ```bash
+   git status
+   ```
+   - If there are uncommitted changes, **ASK THE USER** if they want to commit them
+   - **NEVER force-remove a worktree with uncommitted changes** - this destroys work!
+   - If the user wants to commit, create a commit before proceeding
+
+2. **Read `tmp/.test_env`** to get the TEST_ENV_NUMBER:
    ```bash
    cat tmp/.test_env
    ```
 
-2. **Go back to main repo**:
+3. **Go back to main repo**:
    ```bash
    cd <main-repo-path>   # e.g., /home/micah/work/axis
    ```
 
-3. **Remove the worktree**:
+4. **Remove the worktree** (should succeed without --force if changes are committed):
    ```bash
    git worktree remove tmp/worktrees/<name>
    ```
+   - If this fails due to uncommitted changes, **STOP and ask the user** - do NOT use --force
 
-4. **Checkout the branch** if main repo is on master:
+5. **Checkout the branch** if main repo is on master:
    ```bash
    if [ "$(git branch --show-current)" = "master" ]; then
      git checkout <branch-name>
    fi
    ```
 
-5. **Report done** - user is now on the branch and ready to merge/deploy
+6. **Report done** - user is now on the branch and ready to merge/deploy
 
 ## Listing Worktrees
 
