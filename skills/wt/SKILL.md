@@ -19,9 +19,11 @@ Create a git worktree and switch to it for isolated parallel development.
 
 1. Creates worktree at `tmp/worktrees/<short-name>`
 2. Sets `BUNDLE_GEMFILE` to reuse main repo's gems (no bundle install needed)
-3. Runs `bin/setup` to bootstrap database
+3. Runs `bin/rake bootstrap` to set up database
 4. Switches Claude Code's working directory to the worktree
 5. All further work happens in the worktree until you switch out
+
+**IMPORTANT: Run each step as a separate Bash command. Do NOT chain commands with `&&` or `;`.**
 
 ## Steps to Execute
 
@@ -53,10 +55,10 @@ Create a git worktree and switch to it for isolated parallel development.
    cd tmp/worktrees/<short-name>
    ```
 
-7. **Copy gitignored config files**:
+7. **Copy gitignored config files** (use `cat` not `cp`):
    ```bash
-   cp $MAIN_REPO/config/master.key config/master.key
-   cp $MAIN_REPO/config/database.yml config/database.yml
+   cat $MAIN_REPO/config/master.key > config/master.key
+   cat $MAIN_REPO/config/database.yml > config/database.yml
    ```
 
 8. **Save environment variables** for reference:
@@ -68,9 +70,9 @@ Create a git worktree and switch to it for isolated parallel development.
    EOF
    ```
 
-9. **Run bin/setup** to bootstrap:
+9. **Run bootstrap** to set up the database:
    ```bash
-   BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/setup
+   BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
    ```
 
 9. **Stay in the worktree directory** - do NOT cd back
