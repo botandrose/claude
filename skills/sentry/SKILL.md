@@ -10,154 +10,233 @@ arguments: command [args]
 
 Query the Sentry API for issues, errors, and stacktraces.
 
-## Authentication
+## Important: Minimize Bash Tool Calls
 
-**IMPORTANT:** The `$SENTRY_AUTH_TOKEN` shell variable may not expand correctly in all environments. Always read the token using `printenv`:
+**Each command below must be executed as a SINGLE Bash tool call.** Combine discovery, API calls, and formatting into one script. Never split discovery and the actual command into separate Bash calls.
 
-```bash
-TOKEN=$(printenv SENTRY_AUTH_TOKEN)
-```
+## Implied Action
 
-Then use `$TOKEN` in all curl commands:
+When the user provides an event ID or issue ID — whether via `/sentry <id>` or just pasting an ID in conversation — the implication is **look into it**. Fetch the details and stacktrace immediately, then investigate the cause in the codebase. Do not ask "would you like me to look into this?" — just do it.
 
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" <url>
-```
+## Discovery & Caching
 
-If the token is empty (test with `test -z "$(printenv SENTRY_AUTH_TOKEN)"`), stop and tell the user to set it:
-```
-export SENTRY_AUTH_TOKEN="your-token-here"
-```
+Every script below starts with a discovery preamble that caches org/project info to `/tmp/sentry_config.sh`. This file is sourced on subsequent calls to skip re-discovery.
 
-## Org & Project Discovery
-
-Before running any command, resolve the org slug, project slug, and project numeric ID.
-
-**Use a single API call** to discover everything: `GET /api/0/projects/` returns all accessible projects with embedded organization info.
+The discovery preamble (include at the top of every script):
 
 ```bash
-TOKEN=$(printenv SENTRY_AUTH_TOKEN)
-curl -s -H "Authorization: Bearer $TOKEN" "https://sentry.io/api/0/projects/" -o /tmp/sentry_projects.json
+set -euo pipefail
+TOKEN=$(printenv SENTRY_AUTH_TOKEN || true)
+if [ -z "$TOKEN" ]; then
+  echo "ERROR: SENTRY_AUTH_TOKEN not set. Run: export SENTRY_AUTH_TOKEN=your-token"
+  exit 1
+fi
+
+# Cached discovery
+if [ -f /tmp/sentry_config.sh ]; then
+  source /tmp/sentry_config.sh
+else
+  PROJECT_ID=$(grep -oP 'ingest\.[a-z]+\.sentry\.io/\K[0-9]+' config/initializers/sentry.rb 2>/dev/null || true)
+  if [ -z "$PROJECT_ID" ]; then
+    echo "ERROR: Could not find Sentry DSN in config/initializers/sentry.rb"
+    exit 1
+  fi
+  curl -s -H "Authorization: Bearer $TOKEN" "https://sentry.io/api/0/projects/" -o /tmp/sentry_projects.json
+  ORG_SLUG=$(jq -r ".[] | select(.id == \"$PROJECT_ID\") | .organization.slug" /tmp/sentry_projects.json)
+  PROJECT_SLUG=$(jq -r ".[] | select(.id == \"$PROJECT_ID\") | .slug" /tmp/sentry_projects.json)
+  if [ -z "$ORG_SLUG" ] || [ "$ORG_SLUG" = "null" ]; then
+    echo "ERROR: Could not match project ID $PROJECT_ID to a Sentry project"
+    exit 1
+  fi
+  echo "ORG_SLUG=$ORG_SLUG" > /tmp/sentry_config.sh
+  echo "PROJECT_SLUG=$PROJECT_SLUG" >> /tmp/sentry_config.sh
+  echo "PROJECT_ID=$PROJECT_ID" >> /tmp/sentry_config.sh
+  source /tmp/sentry_config.sh
+fi
 ```
 
-Each project in the response contains:
-- `.id` — project numeric ID
-- `.slug` — project slug
-- `.organization.id` — org numeric ID
-- `.organization.slug` — org slug
+## Argument Auto-Detection
 
-### Matching to the current project
+When the user passes a bare argument (not a subcommand like `issues` or `search`), auto-detect the type:
 
-Check for a Sentry DSN in `config/initializers/sentry.rb`. The DSN format is:
+- **Hex string (8+ hex chars)** → event ID (full or partial). Use the event lookup flow.
+- **Contains letters and hyphens matching `WORD-ALPHANUM`** (e.g., `RUBY-RAILS-N4`) → short issue ID. Use the issue lookup flow.
+- **Pure digits** → numeric issue ID. Use the issue lookup flow.
 
-```
-https://<key>@o<org_id>.ingest.us.sentry.io/<project_id>
-```
-
-Parse out:
-- **org numeric ID**: the number after `o` in the hostname (e.g., `o4506` → `4506`)
-- **project numeric ID**: the path segment after the host (e.g., `/4507` → `4507`)
-
-```bash
-grep -oP 'https://[^@]+@o\K[0-9]+' config/initializers/sentry.rb
-grep -oP 'ingest\.[a-z]+\.sentry\.io/\K[0-9]+' config/initializers/sentry.rb
-```
-
-Then match the project numeric ID from the DSN against `.id` in the projects response to get the project slug and org slug.
-
-### Fallback
-
-If `config/initializers/sentry.rb` doesn't exist or contains no DSN:
-- If there's only one project, use it automatically
-- If multiple projects, list them and ask the user to specify
-
-**Cache the resolved org_slug, project_slug, and project_id for subsequent commands within the session.**
+This means `/sentry 8ab42773` automatically does an event lookup, and `/sentry RUBY-RAILS-N4` automatically does an issue lookup. No need for explicit `issue` or `event` subcommands (though they still work).
 
 ## Commands
 
-### `/sentry` or `/sentry issues [project-slug]` — List recent unresolved issues
+### `/sentry` or `/sentry issues` — List recent unresolved issues
 
-List the 25 most recent unresolved issues. **This is the default command when no arguments are given.** If `project-slug` is provided, filter to that project. If omitted, use the default project discovered above.
+**Default command when no arguments are given.**
 
-1. Use the project numeric ID (already resolved during discovery, or look it up from `/tmp/sentry_projects.json`)
-
-2. Fetch issues and save to a temp file (responses can be large):
+Run as a single script:
 
 ```bash
-TOKEN=$(printenv SENTRY_AUTH_TOKEN)
+# ... discovery preamble ...
+
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://sentry.io/api/0/organizations/{org_slug}/issues/?query=is:unresolved&project={project_id}&sort=date&limit=25" \
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/?query=is:unresolved&project=$PROJECT_ID&sort=date&limit=25" \
   -o /tmp/sentry_issues.json
+
+echo "Short ID|Level|Count|Last Seen|Title"
+echo "-------|-----|-----|---------|-----"
+jq -r '.[] | "\(.shortId)|\(.level)|\(.count)|\(.lastSeen | split("T") | .[0] + " " + (.[1] | split(".")[0]))|\(.title)"' /tmp/sentry_issues.json
 ```
 
-3. Format output as a readable table:
+Present the output as a markdown table.
+
+### `/sentry <issue-id>` or `/sentry issue <issue-id>` — Issue details + latest stacktrace
+
+The `issue-id` can be a numeric issue ID or a short ID like `PROJECT-N4`.
+
+Run as a single script:
 
 ```bash
-jq -r '.[] | "\(.shortId)\t\(.level)\t\(.count)\t\(.lastSeen)\t\(.title)"' /tmp/sentry_issues.json
-```
+# ... discovery preamble ...
 
-Display columns: Short ID, Level, Count, Last Seen, Title.
+ISSUE_ID="<issue-id>"
 
-### `/sentry issue <issue-id>` — Issue details + latest stacktrace
-
-The `issue-id` can be either:
-- A numeric issue ID
-- A short ID like `PROJECT-123`
-
-1. Fetch issue details:
-
-```bash
-TOKEN=$(printenv SENTRY_AUTH_TOKEN)
+# Fetch issue details + latest event in parallel
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://sentry.io/api/0/organizations/{org_slug}/issues/{issue_id}/" \
-  -o /tmp/sentry_issue.json
-```
-
-Display: title, culprit, level, first seen, last seen, count, user count, status, assigned to, link.
-
-2. Fetch the latest event with full stacktrace:
-
-```bash
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/$ISSUE_ID/" \
+  -o /tmp/sentry_issue.json &
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://sentry.io/api/0/organizations/{org_slug}/issues/{issue_id}/events/latest/?full=true" \
-  -o /tmp/sentry_event.json
-```
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/$ISSUE_ID/events/latest/?full=true" \
+  -o /tmp/sentry_event.json &
+wait
 
-3. Extract and format the stacktrace from the event:
+echo "=== Issue Details ==="
+jq -r '"Title: \(.title)\nCulprit: \(.culprit)\nLevel: \(.level)\nFirst seen: \(.firstSeen)\nLast seen: \(.lastSeen)\nCount: \(.count)\nUsers: \(.userCount)\nStatus: \(.status)\nAssigned: \(.assignedTo.name // "unassigned")\nLink: \(.permalink)"' /tmp/sentry_issue.json
 
-The stacktrace lives in the event's `entries` array. Look for entries with `type: "exception"`. Each exception entry has `data.values[]` containing exceptions with `type`, `value`, and `stacktrace.frames[]`.
-
-Extract with:
-```bash
+echo ""
+echo "=== Stacktrace ==="
 jq -r '.entries[] | select(.type == "exception") | .data.values[] | "Exception: \(.type): \(.value)\n", (.stacktrace.frames[] | "  \(.filename):\(.lineNo) in \(.function)")' /tmp/sentry_event.json
 ```
 
-Show the full exception chain with the most recent exception last. Include the exception type and message.
+Display the issue metadata and full stacktrace together.
+
+### `/sentry <event-id>` — Event lookup (full or partial hex ID)
+
+Detected automatically when the argument is a hex string (8+ hex chars). Full event IDs (32+ hex chars) use the direct resolve endpoint; partial IDs paginate through recent project events to find a match.
+
+Run as a single script:
+
+```bash
+# ... discovery preamble ...
+
+EVENT_ID="<event-id>"
+
+# Determine if this is a full event ID (32 hex chars) or partial
+CLEAN_ID=$(echo "$EVENT_ID" | tr -d '-')
+ID_LEN=${#CLEAN_ID}
+
+if [ "$ID_LEN" -ge 32 ]; then
+  # Full event ID -- use the direct resolve endpoint
+  curl -s -H "Authorization: Bearer $TOKEN" \
+    "https://sentry.io/api/0/organizations/$ORG_SLUG/eventids/$EVENT_ID/" \
+    -o /tmp/sentry_resolved.json
+
+  FULL_EVENT_ID=$(jq -r '.event.eventID // empty' /tmp/sentry_resolved.json)
+  ISSUE_ID=$(jq -r '.groupId // empty' /tmp/sentry_resolved.json)
+
+  if [ -z "$FULL_EVENT_ID" ]; then
+    echo "ERROR: Could not resolve event ID '$EVENT_ID'"
+    jq '.' /tmp/sentry_resolved.json
+    exit 1
+  fi
+else
+  # Partial event ID -- paginate through project events to find a match
+  FULL_EVENT_ID=""
+  ISSUE_ID=""
+  CURSOR=""
+  MAX_PAGES=10  # 10 pages x 100 events = 1000 events searched
+
+  for PAGE in $(seq 1 $MAX_PAGES); do
+    URL="https://sentry.io/api/0/projects/$ORG_SLUG/$PROJECT_SLUG/events/?per_page=100&full=false"
+    if [ -n "$CURSOR" ]; then
+      URL="${URL}&cursor=${CURSOR}"
+    fi
+
+    RESPONSE=$(curl -sD /tmp/sentry_headers.txt -H "Authorization: Bearer $TOKEN" "$URL")
+
+    # Search for matching event in this page
+    MATCH=$(echo "$RESPONSE" | jq -r ".[] | select(.eventID | startswith(\"$EVENT_ID\")) | .eventID + \" \" + .groupID" | head -1)
+
+    if [ -n "$MATCH" ]; then
+      FULL_EVENT_ID=$(echo "$MATCH" | cut -d' ' -f1)
+      ISSUE_ID=$(echo "$MATCH" | cut -d' ' -f2)
+      break
+    fi
+
+    # Extract next cursor from Link header
+    CURSOR=$(grep -i '^link:' /tmp/sentry_headers.txt | grep -oP 'cursor=\K[^&>]+(?=[^>]*rel="next"[^>]*results="true")' || true)
+    if [ -z "$CURSOR" ]; then
+      break  # No more pages
+    fi
+  done
+
+  if [ -z "$FULL_EVENT_ID" ]; then
+    echo "ERROR: No event found matching prefix '$EVENT_ID' in the last 1000 events."
+    echo "The event may be older. Try providing the full 32-character event ID."
+    exit 1
+  fi
+fi
+
+echo "Resolved event: $FULL_EVENT_ID (issue: $ISSUE_ID)"
+echo ""
+
+# Now fetch issue details + the specific event in parallel
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/$ISSUE_ID/" \
+  -o /tmp/sentry_issue.json &
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/$ISSUE_ID/events/$FULL_EVENT_ID/?full=true" \
+  -o /tmp/sentry_event.json &
+wait
+
+echo "=== Issue Details ==="
+jq -r '"Title: \(.title)\nShort ID: \(.shortId)\nCulprit: \(.culprit)\nLevel: \(.level)\nFirst seen: \(.firstSeen)\nLast seen: \(.lastSeen)\nCount: \(.count)\nUsers: \(.userCount)\nStatus: \(.status)\nAssigned: \(.assignedTo.name // "unassigned")\nLink: \(.permalink)"' /tmp/sentry_issue.json
+
+echo ""
+echo "=== Stacktrace (event $FULL_EVENT_ID) ==="
+jq -r '.entries[] | select(.type == "exception") | .data.values[] | "Exception: \(.type): \(.value)\n", (.stacktrace.frames[] | "  \(.filename):\(.lineNo) in \(.function)")' /tmp/sentry_event.json
+```
 
 ### `/sentry search <query>` — Search issues
 
-Search issues using Sentry's query syntax.
+Search issues using Sentry's query syntax. The query is passed directly to Sentry's search.
 
-```bash
-TOKEN=$(printenv SENTRY_AUTH_TOKEN)
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://sentry.io/api/0/organizations/{org_slug}/issues/?query={url_encoded_query}&sort=date&limit=25" \
-  -o /tmp/sentry_search.json
-```
-
-The query is passed directly to Sentry's search. Common query syntax:
+Common query syntax:
 - `is:unresolved` — only unresolved issues
 - `assigned:me` — assigned to the token owner
 - `level:error` — only errors
 - `message:something` — search by message text
 - Free text searches error messages
 
-Format the results the same as `/sentry issues`.
+Run as a single script:
+
+```bash
+# ... discovery preamble ...
+
+QUERY="<url_encoded_query>"
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://sentry.io/api/0/organizations/$ORG_SLUG/issues/?query=$QUERY&sort=date&limit=25" \
+  -o /tmp/sentry_search.json
+
+echo "Short ID|Level|Count|Last Seen|Title"
+echo "-------|-----|-----|---------|-----"
+jq -r '.[] | "\(.shortId)|\(.level)|\(.count)|\(.lastSeen | split("T") | .[0] + " " + (.[1] | split(".")[0]))|\(.title)"' /tmp/sentry_search.json
+```
+
+Present the output as a markdown table.
 
 ## Output Formatting
 
-- Save all API responses to temp files first, then parse with `jq` (avoids issues with large responses in pipes)
-- Present data in readable, aligned columns suitable for terminal output
-- For stacktraces, format frames clearly with filename, line number, function name, and context
+- Save all API responses to temp files, then parse with `jq`
+- Present tabular data as markdown tables
+- For stacktraces, show frames with filename, line number, and function name
 - Show exception type and message prominently
 - If an API call fails, show the HTTP status code and error message from the response
