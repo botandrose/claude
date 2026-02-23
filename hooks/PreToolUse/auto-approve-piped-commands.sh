@@ -75,7 +75,7 @@ is_command_allowed() {
   local -n prefixes_ref=$2
 
   for allowed in "${prefixes_ref[@]}"; do
-    if [[ "$full_command" == "$allowed" ]] || [[ "$full_command" == "$allowed "* ]] || [[ "$full_command" == "$allowed/"* ]]; then
+    if [[ "$full_command" == $allowed ]] || [[ "$full_command" == "$allowed "* ]] || [[ "$full_command" == "$allowed/"* ]]; then
       debug "ALLOWED: '$full_command' (matches '$allowed')"
       return 0
     fi
