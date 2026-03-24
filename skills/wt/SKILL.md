@@ -2,7 +2,7 @@
 name: wt
 description: Create a git worktree for parallel Claude Code development. Pass a branch name and it sets up an isolated worktree with its own test database, then switches to working in that directory.
 user-invocable: true
-arguments: branch-name
+arguments: branch-name --test-env
 ---
 
 # Worktree Skill
@@ -13,25 +13,34 @@ Create a git worktree and switch to it for isolated parallel development.
 
 ```
 /wt <branch-name>
+/wt <branch-name> --test-env 3
 ```
+
+## Arguments
+
+- **branch-name** — Required. The git branch to use. Created automatically if it doesn't exist.
+- **--test-env N** — Optional. Explicit TEST_ENV_NUMBER to use. If omitted, auto-calculated from existing worktree count. Use this when spawning multiple worktrees concurrently to avoid collisions.
 
 ## What Happens
 
-1. Creates worktree at `tmp/worktrees/<short-name>`
-2. Sets `BUNDLE_GEMFILE` to reuse main repo's gems (no bundle install needed)
-3. Runs `bin/rake bootstrap` to set up database
-4. Switches Claude Code's working directory to the worktree
-5. All further work happens in the worktree until you switch out
+1. Creates the git branch if it doesn't exist
+2. Creates worktree at `tmp/worktrees/<short-name>`
+3. Sets `BUNDLE_GEMFILE` to reuse main repo's gems (no bundle install needed)
+4. Runs `bin/rake bootstrap` to set up database
+5. Switches Claude Code's working directory to the worktree
+6. All further work happens in the worktree until you switch out
 
 **IMPORTANT: Run each step as a separate Bash command. Do NOT chain commands with `&&` or `;`.**
 
 ## Steps to Execute
 
-1. **Parse the branch name** from `$ARGUMENTS`
-   - If empty, list available branches with `git branch -a` and stop
+1. **Parse arguments** from `$ARGUMENTS`
+   - Extract the branch name (first argument that doesn't start with `--`)
+   - Extract `--test-env N` value if provided
+   - If no branch name given, list available branches with `git branch -a` and stop
 
 2. **Derive short directory name** from the branch:
-   - Strip prefixes: `feature/`, `fix/`, `bugfix/`, `hotfix/`
+   - Strip prefixes: `feature/`, `fix/`, `bugfix/`, `hotfix/`, `chore/`
    - Example: `feature/foo-bar` → `foo-bar`
 
 3. **Save the main repo path** before changing directories:
@@ -39,49 +48,60 @@ Create a git worktree and switch to it for isolated parallel development.
    MAIN_REPO=$(git rev-parse --show-toplevel)
    ```
 
-4. **Calculate TEST_ENV_NUMBER**:
+4. **Create the branch if it doesn't exist**:
+   ```bash
+   git show-ref --verify --quiet refs/heads/<branch-name> || git branch <branch-name>
+   ```
+
+5. **Calculate TEST_ENV_NUMBER** (skip if `--test-env` was provided):
    ```bash
    NUM=$(($(ls -d tmp/worktrees/*/ 2>/dev/null | wc -l) + 1))
    ```
 
-5. **Create the worktree**:
+6. **Create the worktree**:
    ```bash
    mkdir -p tmp/worktrees
+   ```
+   ```bash
    git worktree add tmp/worktrees/<short-name> <branch-name>
    ```
 
-6. **Change to worktree directory**:
+7. **Change to worktree directory**:
    ```bash
    cd tmp/worktrees/<short-name>
    ```
 
-7. **Copy gitignored config files** (use `cat` not `cp`):
+8. **Copy gitignored config files** (use `cat` not `cp`):
    ```bash
    cat $MAIN_REPO/config/master.key > config/master.key
+   ```
+   ```bash
    cat $MAIN_REPO/config/database.yml > config/database.yml
    ```
 
-8. **Save environment variables** for reference:
+9. **Save environment variables** for reference:
    ```bash
    mkdir -p tmp
+   ```
+   ```bash
    cat > tmp/.test_env << 'EOF'
    export TEST_ENV_NUMBER=<NUM>
    export BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile
    EOF
    ```
 
-9. **Run bootstrap** to set up the database:
-   ```bash
-   BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
-   ```
+10. **Run bootstrap** to set up the database:
+    ```bash
+    BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
+    ```
 
-9. **Stay in the worktree directory** - do NOT cd back
+11. **Stay in the worktree directory** - do NOT cd back
 
-10. **Report success**:
+12. **Report success**:
     ```
     Now working in: tmp/worktrees/<short-name>
     Branch: <branch-name>
-    Test database: axis_test<NUM>
+    TEST_ENV_NUMBER: <NUM>
 
     For all commands, use: BUNDLE_GEMFILE=<main-repo>/Gemfile TEST_ENV_NUMBER=<NUM>
     ```
