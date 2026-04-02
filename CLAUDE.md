@@ -115,15 +115,15 @@ When debugging test failures on a branch:
 When running cucumber tests:
 - **NEVER run the full cucumber test suite** - it is extremely slow. Only run specific feature files relevant to the current work (e.g., `bundle exec cucumber features/specific.feature`)
 - **NEVER run a cucumber test without piping to an output file** - **ALWAYS** pipe output to a file first with a unique filename to avoid collisions with other Claude sessions
-- Use a unique identifier in the filename (e.g., include feature name, timestamp, or random suffix)
 - Cucumber tests are VERY slow - never run the same test multiple times with different grep patterns
 - After piping to a file, use grep/cat on that file to extract specific information
 - This significantly reduces token usage and test execution time
+- Use a descriptive filename based on the feature being tested, with `$RANDOM` for uniqueness across sessions
 - Example workflow:
-  1. Run test once: `bundle exec cucumber path/to/test.feature 2>&1 | tee /tmp/cucumber_$(basename path/to/test.feature .feature)_$$.txt`
-  2. Analyze: `grep "error" /tmp/cucumber_<feature>_<pid>.txt`
-  3. Get more context: `grep -A 10 -B 5 "specific error" /tmp/cucumber_<feature>_<pid>.txt`
-- The `$$` in bash expands to the shell's PID, providing uniqueness across sessions
+  1. Assign filename: `F=/tmp/cucumber_login_$RANDOM.txt`
+  2. Run test once: `bundle exec cucumber path/to/test.feature 2>&1 | tee "$F"`
+  3. Analyze: `grep "error" "$F"`
+  4. Get more context: `grep -A 10 -B 5 "specific error" "$F"`
 - **NEVER run multiple Cucumber commands in parallel without separate databases** — all scenarios share the same test database. To run Cucumber features in parallel, prefix each command with a unique `TEST_ENV_NUMBER=N` (e.g., `TEST_ENV_NUMBER=2 bundle exec cucumber ...`). Ensure the corresponding test database exists and is migrated.
 
 ## Testing with RSpec
@@ -131,10 +131,12 @@ When running cucumber tests:
 When running the full rspec suite:
 - **NEVER run the full rspec suite without piping to an output file** - **ALWAYS** use `tee` to capture output
 - After piping to a file, use grep/cat on that file to extract specific information
+- Use a descriptive filename based on the work being done, with `$RANDOM` for uniqueness across sessions
 - Example workflow:
-  1. Run suite once: `bundle exec rspec 2>&1 | tee /tmp/rspec_$$.txt`
-  2. Analyze: `grep -E "(Failed|Error)" /tmp/rspec_<pid>.txt`
-  3. Get more context: `grep -A 10 -B 5 "specific error" /tmp/rspec_<pid>.txt`
+  1. Assign filename: `F=/tmp/rspec_auth_changes_$RANDOM.txt`
+  2. Run suite once: `bundle exec rspec 2>&1 | tee "$F"`
+  3. Analyze: `grep -E "(Failed|Error)" "$F"`
+  4. Get more context: `grep -A 10 -B 5 "specific error" "$F"`
 
 When editing Cucumber tables:
 - **ALWAYS preserve column alignment** - maintain consistent spacing so columns line up
