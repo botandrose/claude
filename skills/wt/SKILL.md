@@ -19,7 +19,7 @@ Create a git worktree and switch to it for isolated parallel development.
 ## Arguments
 
 - **branch-name** — Required. The git branch to use. Created automatically if it doesn't exist.
-- **--test-env N** — Optional. Explicit TEST_ENV_NUMBER to use. If omitted, auto-calculated from existing worktree count. Use this when spawning multiple worktrees concurrently to avoid collisions.
+- **--test-env N** — Optional. Explicit TEST_ENV_NUMBER to use. If omitted, auto-calculated as max existing number + 1 from the worktree registry.
 
 ## What Happens
 
@@ -55,7 +55,8 @@ Create a git worktree and switch to it for isolated parallel development.
 
 5. **Calculate TEST_ENV_NUMBER** (skip if `--test-env` was provided):
    ```bash
-   NUM=$(($(ls -d tmp/worktrees/*/ 2>/dev/null | wc -l) + 1))
+   MAX=$(cut -d= -f2 $MAIN_REPO/tmp/worktree_registry 2>/dev/null | sort -n | tail -1)
+   NUM=$(( ${MAX:-1} + 1 ))
    ```
 
 6. **Create the worktree**:
@@ -79,15 +80,9 @@ Create a git worktree and switch to it for isolated parallel development.
    cat $MAIN_REPO/config/database.yml > config/database.yml
    ```
 
-9. **Save environment variables** for reference:
+9. **Register in worktree registry** (in the main repo):
    ```bash
-   mkdir -p tmp
-   ```
-   ```bash
-   cat > tmp/.test_env << 'EOF'
-   export TEST_ENV_NUMBER=<NUM>
-   export BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile
-   EOF
+   echo "<short-name>=<NUM>" >> $MAIN_REPO/tmp/worktree_registry
    ```
 
 10. **Run bootstrap** to set up the database:
@@ -125,9 +120,10 @@ When the user says they're done with a worktree and want to merge/deploy:
    - **NEVER force-remove a worktree with uncommitted changes** - this destroys work!
    - If the user wants to commit, create a commit before proceeding
 
-2. **Read `tmp/.test_env`** to get the TEST_ENV_NUMBER:
+2. **Read TEST_ENV_NUMBER from registry**:
    ```bash
-   cat tmp/.test_env
+   WORKTREE_NAME=$(basename $(pwd))
+   grep "^${WORKTREE_NAME}=" <main-repo-path>/tmp/worktree_registry
    ```
 
 3. **Go back to main repo**:
