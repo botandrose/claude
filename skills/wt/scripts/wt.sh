@@ -61,9 +61,9 @@ cmd_create() {
   mkdir -p "$MAIN_REPO/tmp/worktrees"
   git worktree add "$MAIN_REPO/tmp/worktrees/$dir" "$branch"
 
-  echo "$MAIN_REPO/tmp/worktrees/$dir"
-  echo "$branch"
-  echo "$num"
+  echo "WORKTREE_DIR=$MAIN_REPO/tmp/worktrees/$dir"
+  echo "BRANCH=$branch"
+  echo "TEST_ENV_NUMBER=$num"
 }
 
 cmd_env() {

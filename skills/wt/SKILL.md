@@ -49,43 +49,33 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
    - Extract the branch name (first argument)
    - If no branch name given, list available branches with `git branch -a` and stop
 
-2. **Save the main repo path**:
+2. **Create the worktree** using the CLI script. It handles TEST_ENV_NUMBER assignment, branch creation, and worktree creation atomically:
+   ```bash
+   ${CLAUDE_SKILL_DIR}/scripts/wt.sh create <branch-name>
+   ```
+   The script outputs `WORKTREE_DIR=...`, `BRANCH=...`, and `TEST_ENV_NUMBER=...`. Use these values for subsequent steps.
+
+3. **Save the main repo path** before changing directories:
    ```bash
    MAIN_REPO=$(git rev-parse --show-toplevel)
    ```
 
-3. **Create the worktree** using the CLI script. It handles TEST_ENV_NUMBER assignment, branch creation, and worktree creation atomically:
-   ```bash
-   OUTPUT=$($MAIN_REPO/skills/wt/scripts/wt.sh create <branch-name>)
-   ```
-   The script outputs three lines:
-   - Line 1: worktree path
-   - Line 2: branch name (with TEST_ENV_NUMBER prefix added if it was missing)
-   - Line 3: TEST_ENV_NUMBER
-
-   Parse them:
-   ```bash
-   WORKTREE_DIR=$(echo "$OUTPUT" | sed -n '1p')
-   BRANCH=$(echo "$OUTPUT" | sed -n '2p')
-   NUM=$(echo "$OUTPUT" | sed -n '3p')
-   ```
-
 4. **Change to worktree directory**:
    ```bash
-   cd $WORKTREE_DIR
+   cd <WORKTREE_DIR>
    ```
 
 5. **Copy gitignored config files** (use `cat` not `cp`):
    ```bash
-   cat $MAIN_REPO/config/master.key > config/master.key
+   cat <MAIN_REPO>/config/master.key > config/master.key
    ```
    ```bash
-   cat $MAIN_REPO/config/database.yml > config/database.yml
+   cat <MAIN_REPO>/config/database.yml > config/database.yml
    ```
 
 6. **Run bootstrap** to set up the database:
     ```bash
-    BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
+    BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile TEST_ENV_NUMBER=<TEST_ENV_NUMBER> bin/rake bootstrap
     ```
 
 7. **Stay in the worktree directory** - do NOT cd back
@@ -94,9 +84,9 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
     ```
     Now working in: <WORKTREE_DIR>
     Branch: <BRANCH>
-    TEST_ENV_NUMBER: <NUM>
+    TEST_ENV_NUMBER: <TEST_ENV_NUMBER>
 
-    For all commands, use: BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile TEST_ENV_NUMBER=<NUM>
+    For all commands, use: BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile TEST_ENV_NUMBER=<TEST_ENV_NUMBER>
     ```
 
 ## Important
@@ -119,7 +109,7 @@ When the user says they're done with a worktree and want to finish it:
 
 2. **Run the finish command** (must be run from inside the worktree):
    ```bash
-   $MAIN_REPO/skills/wt/scripts/wt.sh finish
+   ${CLAUDE_SKILL_DIR}/scripts/wt.sh finish
    ```
    This will:
    - Abort if there are uncommitted changes
@@ -135,7 +125,7 @@ When the user says they're done with a worktree and want to finish it:
 When the user wants to discard a worktree and its branch entirely:
 
 ```bash
-$MAIN_REPO/skills/wt/scripts/wt.sh abandon
+${CLAUDE_SKILL_DIR}/scripts/wt.sh abandon
 ```
 
 This will:
@@ -147,5 +137,5 @@ This will:
 ## Listing Worktrees
 
 ```bash
-$MAIN_REPO/skills/wt/scripts/wt.sh list
+${CLAUDE_SKILL_DIR}/scripts/wt.sh list
 ```
