@@ -2,24 +2,35 @@
 name: wt
 description: Create a git worktree for parallel Claude Code development. Pass a branch name and it sets up an isolated worktree with its own test database, then switches to working in that directory.
 user-invocable: true
-arguments: branch-name --test-env
+arguments: branch-name
 ---
 
 # Worktree Skill
 
 Create a git worktree and switch to it for isolated parallel development.
 
+## Branch Name Convention
+
+Branch names MUST be prefixed with the TEST_ENV_NUMBER:
+
+```
+<TEST_ENV_NUMBER>-<rest-of-branch-name>
+```
+
+Examples:
+- `11-472852-my-fancy-feature`
+- `3-fix-login-bug`
+- `7-123456-add-user-search`
+
+The first segment before the first `-` is the TEST_ENV_NUMBER, which is always 1-2 digits (under 100). A 3+ digit leading number would be a ticket ID, not a TEST_ENV_NUMBER. This eliminates the need for a separate registry — the number is encoded directly in the branch name.
+
 ## Usage
 
 ```
 /wt <branch-name>
-/wt <branch-name> --test-env 3
 ```
 
-## Arguments
-
-- **branch-name** — Required. The git branch to use. Created automatically if it doesn't exist.
-- **--test-env N** — Optional. Explicit TEST_ENV_NUMBER to use. If omitted, auto-calculated as max existing number + 1 from the worktree registry.
+If the branch name already starts with a number prefix, use it as-is. If not, the skill will auto-assign the next available TEST_ENV_NUMBER and prepend it.
 
 ## What Happens
 
@@ -35,28 +46,33 @@ Create a git worktree and switch to it for isolated parallel development.
 ## Steps to Execute
 
 1. **Parse arguments** from `$ARGUMENTS`
-   - Extract the branch name (first argument that doesn't start with `--`)
-   - Extract `--test-env N` value if provided
+   - Extract the branch name (first argument)
    - If no branch name given, list available branches with `git branch -a` and stop
 
-2. **Derive short directory name** from the branch:
-   - Strip prefixes: `feature/`, `fix/`, `bugfix/`, `hotfix/`, `chore/`
-   - Example: `feature/foo-bar` → `foo-bar`
+2. **Determine TEST_ENV_NUMBER from the branch name**:
+   - If the branch name matches `^[0-9]{1,2}-` (1-2 digit prefix), extract it as NUM
+     ```bash
+     NUM=$(echo "<branch-name>" | grep -oP '^\d{1,2}(?=-)')
+     ```
+   - If the branch name does NOT have a 1-2 digit prefix (including 3+ digit prefixes like ticket IDs), auto-assign the lowest available slot starting at 2:
+     ```bash
+     USED=$(git worktree list --porcelain | grep '^branch' | grep -oP '/(\d{1,2})-' | grep -oP '\d+' | sort -n)
+     NUM=2; while echo "$USED" | grep -qx "$NUM"; do NUM=$((NUM + 1)); done
+     ```
+     Then prepend it to the branch name: `<NUM>-<branch-name>`
 
-3. **Save the main repo path** before changing directories:
+3. **Derive short directory name** from the branch:
+   - Strip prefixes: `feature/`, `fix/`, `bugfix/`, `hotfix/`, `chore/`
+   - Example: `feature/7-foo-bar` → `7-foo-bar`
+
+4. **Save the main repo path** before changing directories:
    ```bash
    MAIN_REPO=$(git rev-parse --show-toplevel)
    ```
 
-4. **Create the branch if it doesn't exist**:
+5. **Create the branch if it doesn't exist**:
    ```bash
    git show-ref --verify --quiet refs/heads/<branch-name> || git branch <branch-name>
-   ```
-
-5. **Calculate TEST_ENV_NUMBER** (skip if `--test-env` was provided):
-   ```bash
-   MAX=$(cut -d= -f2 $MAIN_REPO/tmp/worktree_registry 2>/dev/null | sort -n | tail -1)
-   NUM=$(( ${MAX:-1} + 1 ))
    ```
 
 6. **Create the worktree**:
@@ -80,19 +96,14 @@ Create a git worktree and switch to it for isolated parallel development.
    cat $MAIN_REPO/config/database.yml > config/database.yml
    ```
 
-9. **Register in worktree registry** (in the main repo):
-   ```bash
-   echo "<short-name>=<NUM>" >> $MAIN_REPO/tmp/worktree_registry
-   ```
-
-10. **Run bootstrap** to set up the database:
+9. **Run bootstrap** to set up the database:
     ```bash
     BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
     ```
 
-11. **Stay in the worktree directory** - do NOT cd back
+10. **Stay in the worktree directory** - do NOT cd back
 
-12. **Report success**:
+11. **Report success**:
     ```
     Now working in: tmp/worktrees/<short-name>
     Branch: <branch-name>
@@ -120,31 +131,25 @@ When the user says they're done with a worktree and want to merge/deploy:
    - **NEVER force-remove a worktree with uncommitted changes** - this destroys work!
    - If the user wants to commit, create a commit before proceeding
 
-2. **Read TEST_ENV_NUMBER from registry**:
-   ```bash
-   WORKTREE_NAME=$(basename $(pwd))
-   grep "^${WORKTREE_NAME}=" <main-repo-path>/tmp/worktree_registry
-   ```
-
-3. **Go back to main repo**:
+2. **Go back to main repo**:
    ```bash
    cd <main-repo-path>   # e.g., /home/micah/work/axis
    ```
 
-4. **Remove the worktree** (should succeed without --force if changes are committed):
+3. **Remove the worktree** (should succeed without --force if changes are committed):
    ```bash
    git worktree remove tmp/worktrees/<name>
    ```
    - If this fails due to uncommitted changes, **STOP and ask the user** - do NOT use --force
 
-5. **Checkout the branch** if main repo is on master:
+4. **Checkout the branch** if main repo is on master:
    ```bash
    if [ "$(git branch --show-current)" = "master" ]; then
      git checkout <branch-name>
    fi
    ```
 
-6. **Report done** - user is now on the branch and ready to merge/deploy
+5. **Report done** - user is now on the branch and ready to merge/deploy
 
 ## Listing Worktrees
 

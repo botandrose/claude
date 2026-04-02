@@ -118,12 +118,12 @@ When running cucumber tests:
 - Cucumber tests are VERY slow - never run the same test multiple times with different grep patterns
 - After piping to a file, use grep/cat on that file to extract specific information
 - This significantly reduces token usage and test execution time
-- Use a descriptive filename based on the feature being tested, with `$RANDOM` for uniqueness across sessions
+- Use a descriptive filename based on the feature being tested, with a random number for uniqueness across sessions
+- **Do NOT use shell variable expansion** (`$RANDOM`, `$F`, etc.) — use literal values to avoid permission prompts
 - Example workflow:
-  1. Assign filename: `F=/tmp/cucumber_login_$RANDOM.txt`
-  2. Run test once: `bundle exec cucumber path/to/test.feature 2>&1 | tee "$F"`
-  3. Analyze: `grep "error" "$F"`
-  4. Get more context: `grep -A 10 -B 5 "specific error" "$F"`
+  1. Run test: `bundle exec cucumber path/to/test.feature 2>&1 | tee /tmp/cucumber_login_38291.txt`
+  2. Analyze: `grep "error" /tmp/cucumber_login_38291.txt`
+  3. Get more context: `grep -A 10 -B 5 "specific error" /tmp/cucumber_login_38291.txt`
 - **NEVER run multiple Cucumber commands in parallel without separate databases** — all scenarios share the same test database. To run Cucumber features in parallel, prefix each command with a unique `TEST_ENV_NUMBER=N` (e.g., `TEST_ENV_NUMBER=2 bundle exec cucumber ...`). Ensure the corresponding test database exists and is migrated.
 
 ## Testing with RSpec
@@ -131,12 +131,12 @@ When running cucumber tests:
 When running the full rspec suite:
 - **NEVER run the full rspec suite without piping to an output file** - **ALWAYS** use `tee` to capture output
 - After piping to a file, use grep/cat on that file to extract specific information
-- Use a descriptive filename based on the work being done, with `$RANDOM` for uniqueness across sessions
+- Use a descriptive filename based on the work being done, with a random number for uniqueness across sessions
+- **Do NOT use shell variable expansion** (`$RANDOM`, `$F`, etc.) — use literal values to avoid permission prompts
 - Example workflow:
-  1. Assign filename: `F=/tmp/rspec_auth_changes_$RANDOM.txt`
-  2. Run suite once: `bundle exec rspec 2>&1 | tee "$F"`
-  3. Analyze: `grep -E "(Failed|Error)" "$F"`
-  4. Get more context: `grep -A 10 -B 5 "specific error" "$F"`
+  1. Run suite: `bundle exec rspec 2>&1 | tee /tmp/rspec_auth_changes_38291.txt`
+  2. Analyze: `grep -E "(Failed|Error)" /tmp/rspec_auth_changes_38291.txt`
+  3. Get more context: `grep -A 10 -B 5 "specific error" /tmp/rspec_auth_changes_38291.txt`
 
 When editing Cucumber tables:
 - **ALWAYS preserve column alignment** - maintain consistent spacing so columns line up
@@ -162,7 +162,7 @@ Chop is a Ruby gem ([botandrose/chop](https://github.com/botandrose/chop)) that 
 - **Detached HEAD is a worktree signal** — if git status shows `HEAD` instead of a branch name, verify with `git worktree list`
 - If a worktree is active, ALL work (file edits, git commands, test runs) must happen there, not in the main repo
 - Working in the main repo when a worktree exists stomps on other people's in-progress changes
-- Look up the worktree's `TEST_ENV_NUMBER` from the main repo's `tmp/worktree_registry` (format: `<worktree-name>=<number>`, one per line)
+- **TEST_ENV_NUMBER is encoded in the branch name prefix** — branch names follow the format `<TEST_ENV_NUMBER>-<rest>` (e.g., `11-472852-my-feature`). The prefix is always 1-2 digits (under 100); a 3+ digit prefix is a ticket ID, not a TEST_ENV_NUMBER. Extract it: `git branch --show-current | grep -oP '^\d{1,2}(?=-)'`
 
 **Plans in worktrees:**
 - Plans must include the full worktree path and `TEST_ENV_NUMBER`
