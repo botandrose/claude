@@ -12,14 +12,14 @@ MAIN_REPO=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 
 # Extract TEST_ENV_NUMBER from a branch name (1-2 digit prefix before first dash)
 parse_env_number() {
-  echo "$1" | grep -oP '^\d{1,2}(?=-)'
+  echo "$1" | grep -oP '^\d{1,2}(?=-)' || true
 }
 
 # List TEST_ENV_NUMBERs currently in use by worktrees
 used_env_numbers() {
   git worktree list --porcelain \
     | grep '^branch' \
-    | grep -oP '/\K\d{1,2}(?=-)' \
+    | { grep -oP '/\K\d{1,2}(?=-)' || true; } \
     | sort -n
 }
 
@@ -36,7 +36,7 @@ next_env_number() {
 
 # Derive short directory name from branch (strip common prefixes)
 short_name() {
-  echo "$1" | sed -E 's|^(feature|fix|bugfix|hotfix|chore)/||'
+  echo "$1" | sed -E 's#^(feature|fix|bugfix|hotfix|chore)/##'
 }
 
 cmd_create() {
