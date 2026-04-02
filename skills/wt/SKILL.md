@@ -49,46 +49,33 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
    - Extract the branch name (first argument)
    - If no branch name given, list available branches with `git branch -a` and stop
 
-2. **Determine TEST_ENV_NUMBER from the branch name**:
-   - If the branch name matches `^[0-9]{1,2}-` (1-2 digit prefix), extract it as NUM
-     ```bash
-     NUM=$(echo "<branch-name>" | grep -oP '^\d{1,2}(?=-)')
-     ```
-   - If the branch name does NOT have a 1-2 digit prefix (including 3+ digit prefixes like ticket IDs), auto-assign the lowest available slot starting at 2:
-     ```bash
-     USED=$(git worktree list --porcelain | grep '^branch' | grep -oP '/(\d{1,2})-' | grep -oP '\d+' | sort -n)
-     NUM=2; while echo "$USED" | grep -qx "$NUM"; do NUM=$((NUM + 1)); done
-     ```
-     Then prepend it to the branch name: `<NUM>-<branch-name>`
-
-3. **Derive short directory name** from the branch:
-   - Strip prefixes: `feature/`, `fix/`, `bugfix/`, `hotfix/`, `chore/`
-   - Example: `feature/7-foo-bar` → `7-foo-bar`
-
-4. **Save the main repo path** before changing directories:
+2. **Save the main repo path**:
    ```bash
    MAIN_REPO=$(git rev-parse --show-toplevel)
    ```
 
-5. **Create the branch if it doesn't exist**:
+3. **Create the worktree** using the CLI script. It handles TEST_ENV_NUMBER assignment, branch creation, and worktree creation atomically:
    ```bash
-   git show-ref --verify --quiet refs/heads/<branch-name> || git branch <branch-name>
+   OUTPUT=$($MAIN_REPO/skills/wt/scripts/wt.sh create <branch-name>)
+   ```
+   The script outputs three lines:
+   - Line 1: worktree path
+   - Line 2: branch name (with TEST_ENV_NUMBER prefix added if it was missing)
+   - Line 3: TEST_ENV_NUMBER
+
+   Parse them:
+   ```bash
+   WORKTREE_DIR=$(echo "$OUTPUT" | sed -n '1p')
+   BRANCH=$(echo "$OUTPUT" | sed -n '2p')
+   NUM=$(echo "$OUTPUT" | sed -n '3p')
    ```
 
-6. **Create the worktree**:
+4. **Change to worktree directory**:
    ```bash
-   mkdir -p tmp/worktrees
-   ```
-   ```bash
-   git worktree add tmp/worktrees/<short-name> <branch-name>
+   cd $WORKTREE_DIR
    ```
 
-7. **Change to worktree directory**:
-   ```bash
-   cd tmp/worktrees/<short-name>
-   ```
-
-8. **Copy gitignored config files** (use `cat` not `cp`):
+5. **Copy gitignored config files** (use `cat` not `cp`):
    ```bash
    cat $MAIN_REPO/config/master.key > config/master.key
    ```
@@ -96,20 +83,20 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
    cat $MAIN_REPO/config/database.yml > config/database.yml
    ```
 
-9. **Run bootstrap** to set up the database:
+6. **Run bootstrap** to set up the database:
     ```bash
     BUNDLE_GEMFILE=$MAIN_REPO/Gemfile TEST_ENV_NUMBER=$NUM bin/rake bootstrap
     ```
 
-10. **Stay in the worktree directory** - do NOT cd back
+7. **Stay in the worktree directory** - do NOT cd back
 
-11. **Report success**:
+8. **Report success**:
     ```
-    Now working in: tmp/worktrees/<short-name>
-    Branch: <branch-name>
+    Now working in: <WORKTREE_DIR>
+    Branch: <BRANCH>
     TEST_ENV_NUMBER: <NUM>
 
-    For all commands, use: BUNDLE_GEMFILE=<main-repo>/Gemfile TEST_ENV_NUMBER=<NUM>
+    For all commands, use: BUNDLE_GEMFILE=<MAIN_REPO>/Gemfile TEST_ENV_NUMBER=<NUM>
     ```
 
 ## Important
@@ -119,40 +106,46 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
   - `BUNDLE_GEMFILE=<main-repo>/Gemfile` - reuse gems from main repo
   - `TEST_ENV_NUMBER=<NUM>` - use isolated test database
 
-## Closing a Worktree
+## Finishing a Worktree
 
-When the user says they're done with a worktree and want to merge/deploy:
+When the user says they're done with a worktree and want to finish it:
 
 1. **CRITICAL: Check for uncommitted changes first**:
    ```bash
    git status
    ```
    - If there are uncommitted changes, **ASK THE USER** if they want to commit them
-   - **NEVER force-remove a worktree with uncommitted changes** - this destroys work!
    - If the user wants to commit, create a commit before proceeding
 
-2. **Go back to main repo**:
+2. **Run the finish command** (must be run from inside the worktree):
    ```bash
-   cd <main-repo-path>   # e.g., /home/micah/work/axis
+   $MAIN_REPO/skills/wt/scripts/wt.sh finish
    ```
+   This will:
+   - Abort if there are uncommitted changes
+   - Rebase the branch onto main repo's HEAD
+   - Remove the worktree
+   - If main repo was on master/main: checkout the branch
+   - If main repo was on another branch: merge the worktree branch into it and delete the worktree branch
 
-3. **Remove the worktree** (should succeed without --force if changes are committed):
-   ```bash
-   git worktree remove tmp/worktrees/<name>
-   ```
-   - If this fails due to uncommitted changes, **STOP and ask the user** - do NOT use --force
+3. **Report done** - user is now on the branch and ready to continue
 
-4. **Checkout the branch** if main repo is on master:
-   ```bash
-   if [ "$(git branch --show-current)" = "master" ]; then
-     git checkout <branch-name>
-   fi
-   ```
+## Abandoning a Worktree
 
-5. **Report done** - user is now on the branch and ready to merge/deploy
+When the user wants to discard a worktree and its branch entirely:
+
+```bash
+$MAIN_REPO/skills/wt/scripts/wt.sh abandon
+```
+
+This will:
+- Commit any uncommitted changes (so the worktree can be cleanly removed)
+- Remove the worktree
+- Force-delete the local branch
+- Delete the remote branch if it exists
 
 ## Listing Worktrees
 
 ```bash
-git worktree list
+$MAIN_REPO/skills/wt/scripts/wt.sh list
 ```
