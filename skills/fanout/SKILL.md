@@ -44,6 +44,8 @@ Spawn parallel Claude Code instances, each in its own worktree, from a directory
       <file contents>
 
       <additional instructions, if provided>
+
+      Remember: ALWAYS pipe cucumber output through `tee` to a temp file. Never discard output with `tail` or `head` — capture everything so you can grep it later without re-running slow tests.
       PROMPT_EOF
       ```
 
