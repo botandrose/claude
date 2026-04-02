@@ -51,8 +51,8 @@ Spawn parallel Claude Code instances, each in its own worktree, from a directory
 
    d. **Spawn a wezterm tab**:
       ```bash
-      chmod +x ~/.claude/skills/fanout/spawn-task.sh
-      wezterm cli spawn --cwd "$REPO_ROOT" -- ~/.claude/skills/fanout/spawn-task.sh "$REPO_ROOT" "<branch>" "/tmp/fanout_<branch>.md"
+      chmod +x ${CLAUDE_SKILL_DIR}/spawn-task.sh
+      wezterm cli spawn --cwd "$REPO_ROOT" -- ${CLAUDE_SKILL_DIR}/spawn-task.sh "$REPO_ROOT" "<branch>" "/tmp/fanout_<branch>.md"
       ```
       - Sleep 0.5s between spawns to avoid overwhelming wezterm
 

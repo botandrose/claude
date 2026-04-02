@@ -2,7 +2,7 @@
 name: branch-review
 description: Analyze git branches to determine if they can be safely deleted. Categorizes branches as safe to delete (merged/subset), probably safe (superseded by rebased work), or keep (active unmerged work).
 user-invocable: true
-allowed-tools: Bash(*)
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/branch-review.sh *)
 ---
 
 # Branch Review Skill
@@ -29,7 +29,7 @@ Invoke this skill when the user asks to:
 ### Analyze a Single Branch
 
 ```bash
-branch-review.sh analyze <branch-name>
+${CLAUDE_SKILL_DIR}/branch-review.sh analyze <branch-name>
 ```
 
 **Returns:** Detailed analysis including:
@@ -43,7 +43,7 @@ branch-review.sh analyze <branch-name>
 ### List All Branches with Categories
 
 ```bash
-branch-review.sh list
+${CLAUDE_SKILL_DIR}/branch-review.sh list
 ```
 
 **Returns:** Table of all branches (local and remote) with their category and a brief reason
@@ -51,7 +51,7 @@ branch-review.sh list
 ### Show Safe-to-Delete Branches
 
 ```bash
-branch-review.sh safe
+${CLAUDE_SKILL_DIR}/branch-review.sh safe
 ```
 
 **Returns:** List of branches that are definitely safe to delete (category 1)

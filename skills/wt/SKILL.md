@@ -3,7 +3,7 @@ name: wt
 description: Create a git worktree for parallel Claude Code development. Pass a branch name and it sets up an isolated worktree with its own test database, then switches to working in that directory.
 user-invocable: true
 arguments: branch-name
-allowed-tools: Bash(*wt/scripts/wt.sh *)
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/wt.sh *)
 ---
 
 # Worktree Skill
@@ -101,12 +101,12 @@ If the branch name already starts with a number prefix, use it as-is. If not, th
 
 When the user says they're done with a worktree and want to finish it:
 
-1. **CRITICAL: Check for uncommitted changes first**:
+1. **Commit if needed**:
    ```bash
    git status
    ```
-   - If there are uncommitted changes, **ASK THE USER** if they want to commit them
-   - If the user wants to commit, create a commit before proceeding
+   - If there are uncommitted changes, create a commit summarizing the work done
+   - If the working tree is clean, skip to step 2
 
 2. **Run the finish command** (must be run from inside the worktree):
    ```bash
