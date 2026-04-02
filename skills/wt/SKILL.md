@@ -3,6 +3,7 @@ name: wt
 description: Create a git worktree for parallel Claude Code development. Pass a branch name and it sets up an isolated worktree with its own test database, then switches to working in that directory.
 user-invocable: true
 arguments: branch-name
+allowed-tools: Bash(*wt/scripts/wt.sh *)
 ---
 
 # Worktree Skill
@@ -109,8 +110,11 @@ When the user says they're done with a worktree and want to finish it:
 
 2. **Run the finish command** (must be run from inside the worktree):
    ```bash
-   ${CLAUDE_SKILL_DIR}/scripts/wt.sh finish
+   ${CLAUDE_SKILL_DIR}/scripts/wt.sh finish; cd <MAIN_REPO>
    ```
+   The `cd` must be chained in the same Bash call — the worktree directory is deleted by the script.
+   Use the main repo path saved during worktree creation.
+
    This will:
    - Abort if there are uncommitted changes
    - Rebase the branch onto main repo's HEAD
@@ -125,8 +129,11 @@ When the user says they're done with a worktree and want to finish it:
 When the user wants to discard a worktree and its branch entirely:
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/wt.sh abandon
+${CLAUDE_SKILL_DIR}/scripts/wt.sh abandon; cd <MAIN_REPO>
 ```
+
+The `cd` must be chained in the same Bash call — the worktree directory is deleted by the script.
+Use the main repo path saved during worktree creation.
 
 This will:
 - Commit any uncommitted changes (so the worktree can be cleanly removed)

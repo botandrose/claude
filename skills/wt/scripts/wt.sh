@@ -141,6 +141,7 @@ cmd_finish() {
     git branch -d "$branch"
     echo "Merged $branch into $main_branch and deleted $branch"
   fi
+  echo "MAIN_REPO=$MAIN_REPO"
 }
 
 cmd_abandon() {
@@ -178,6 +179,7 @@ cmd_abandon() {
   else
     echo "Abandoned $branch (deleted local, no remote branch found)"
   fi
+  echo "MAIN_REPO=$MAIN_REPO"
 }
 
 case "${1:-}" in
