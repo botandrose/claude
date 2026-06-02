@@ -46,6 +46,8 @@ cmd_create() {
     exit 1
   fi
 
+  local requested="$branch"
+
   local num
   num=$(parse_env_number "$branch")
 
@@ -57,7 +59,17 @@ cmd_create() {
   local dir
   dir=$(short_name "$branch")
 
-  git show-ref --verify --quiet "refs/heads/$branch" || git branch "$branch"
+  # If a remote branch matches the requested name (e.g. a collaborator's WIP
+  # branch named in the ticket), base the worktree on it instead of HEAD so we
+  # build on their work rather than starting fresh from master.
+  local base=""
+  if git ls-remote --exit-code --heads origin "$requested" >/dev/null 2>&1; then
+    git fetch --quiet origin "$requested"
+    base="FETCH_HEAD"
+    echo "Basing on origin/$requested (matched remote branch)" >&2
+  fi
+
+  git show-ref --verify --quiet "refs/heads/$branch" || git branch "$branch" "${base:-HEAD}"
   mkdir -p "$MAIN_REPO/tmp/worktrees"
   git worktree add "$MAIN_REPO/tmp/worktrees/$dir" "$branch"
 

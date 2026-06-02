@@ -24,6 +24,15 @@ This file provides default guidance to Claude Code (claude.ai/code) across all p
 - Never introduce trailing whitespace in a file
 - Prefer double quotes for strings unless single quotes are required
 
+## Project Management
+Use BARD Tracker MCP server for ticket management. **IMPORTANT** Use it in a read-only fashion, unless explicitly told you otherwise.
+
+### Implementing from a ticket
+- **ALWAYS check the ticket's comments for a named branch** (e.g. "Branch **foo**") before writing any code. If one exists, base ALL your work on that remote branch — `git fetch` and create your branch/worktree from `origin/<branch>` (rebasing onto the main branch as needed), NEVER fresh from master.
+- A branch named in a ticket almost always contains a collaborator's in-progress work (frontend, mockups, partial implementation, WIP tests). Your job is to build on it, not duplicate it or reinvent the approach. Read their diff first and match their structure, naming, and intent.
+- Their WIP may be incomplete or never-run (broken test data, undefined steps, stale assumptions). Finish it faithfully rather than replacing it: fix what's broken, keep what's intended.
+- Only branch from the main branch when the ticket names no branch.
+
 ## Error Handling
 
 **NEVER silently swallow errors.** Bare `rescue` blocks that return nil or a default value hide bugs and make debugging extremely difficult.
@@ -114,8 +123,7 @@ When debugging test failures on a branch:
 
 When running cucumber tests:
 - **NEVER run the full cucumber test suite** - it is extremely slow. Only run specific feature files relevant to the current work (e.g., `bundle exec cucumber features/specific.feature`)
-- **NEVER run a cucumber test without piping to an output file** - **ALWAYS** pipe output to a file first with a unique filename to avoid collisions with other Claude sessions
-- Cucumber tests are VERY slow - never run the same test multiple times with different grep patterns
+- **NEVER run a cucumber test without piping to an output file** - **ALWAYS** pipe output to a file first, so that you can grep it later. Ensure this file has a unique filename to avoid collisions with other Claude sessions
 - After piping to a file, use grep/cat on that file to extract specific information
 - This significantly reduces token usage and test execution time
 - Use a descriptive filename based on the feature being tested, with a random number for uniqueness across sessions

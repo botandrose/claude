@@ -33,9 +33,21 @@ The first segment before the first `-` is the TEST_ENV_NUMBER, which is always 1
 
 If the branch name already starts with a number prefix, use it as-is. If not, the skill will auto-assign the next available TEST_ENV_NUMBER and prepend it.
 
+## Basing on an existing remote branch (ticket branches)
+
+When implementing off a ticket, FIRST check the ticket's comments for a named branch
+(e.g. "Branch **foo**"). If one exists, pass that exact name to `/wt`. A teammate has
+usually pushed in-progress work there (frontend, mockups, partial implementation) that
+you must build on, NOT duplicate or start fresh from master.
+
+`wt.sh create` enforces this automatically: if a remote branch matches the requested
+name, it bases the new worktree on `origin/<name>` instead of the current HEAD (look for
+the `Basing on origin/<name>` line in its output). After creation, rebase onto the main
+branch as needed. Only fall back to branching from master when the ticket names no branch.
+
 ## What Happens
 
-1. Creates the git branch if it doesn't exist
+1. Creates the git branch if it doesn't exist (based on `origin/<name>` when it exists)
 2. Creates worktree at `tmp/worktrees/<short-name>`
 3. Sets `BUNDLE_GEMFILE` to reuse main repo's gems (no bundle install needed)
 4. Runs `bin/rake bootstrap` to set up database
