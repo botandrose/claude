@@ -19,7 +19,8 @@ parse_env_number() {
 used_env_numbers() {
   git worktree list --porcelain \
     | grep '^branch' \
-    | { grep -oP '/\K\d{1,2}(?=-)' || true; } \
+    | sed -E 's#^branch refs/heads/##' \
+    | { grep -oP '^\d{1,2}(?=-)' || true; } \
     | sort -n
 }
 
@@ -34,9 +35,23 @@ next_env_number() {
   echo "$num"
 }
 
-# Derive short directory name from branch (strip common prefixes)
+# Derive a slash-free directory name from a branch name. Strips a known type
+# segment (feature/, fix/, etc.) even when it follows the TEST_ENV_NUMBER
+# prefix, then flattens any remaining slashes so worktrees never nest.
 short_name() {
-  echo "$1" | sed -E 's#^(feature|fix|bugfix|hotfix|chore)/##'
+  echo "$1" \
+    | sed -E 's#^([0-9]{1,2}-)?(feature|fix|bugfix|hotfix|chore)/#\1#' \
+    | tr '/' '-'
+}
+
+# Remove the worktree's parent dir if a slashed branch nested it and it is now
+# empty. Never touches the tmp/worktrees root itself.
+remove_empty_worktree_parent() {
+  local parent
+  parent=$(dirname "$1")
+  if [ "$parent" != "$MAIN_REPO/tmp/worktrees" ]; then
+    rmdir "$parent" 2>/dev/null || true
+  fi
 }
 
 cmd_create() {
@@ -98,7 +113,7 @@ cmd_list() {
     /^worktree / { wt = $2 }
     /^branch /   {
       branch = $2
-      sub(/.*\//, "", branch)
+      sub(/^refs\/heads\//, "", branch)
       match(branch, /^[0-9]{1,2}-/)
       if (RSTART) {
         num = substr(branch, RSTART, RLENGTH - 1)
@@ -129,8 +144,6 @@ cmd_finish() {
 
   local branch
   branch=$(git branch --show-current)
-  local worktree_name
-  worktree_name=$(basename "$worktree_dir")
 
   # Get main repo HEAD branch
   local main_branch
@@ -139,9 +152,11 @@ cmd_finish() {
   # Rebase onto main repo's HEAD
   git rebase "$main_branch"
 
-  # Go back to main repo and remove worktree
+  # Go back to main repo and remove worktree by its absolute path (so slashed
+  # branch names that nest the worktree dir are handled correctly)
   cd "$MAIN_REPO"
-  git worktree remove "tmp/worktrees/$worktree_name"
+  git worktree remove "$worktree_dir"
+  remove_empty_worktree_parent "$worktree_dir"
 
   if [ "$main_branch" = "master" ] || [ "$main_branch" = "main" ]; then
     # Main repo is on master/main — just checkout the branch
@@ -168,8 +183,6 @@ cmd_abandon() {
 
   local branch
   branch=$(git branch --show-current)
-  local worktree_name
-  worktree_name=$(basename "$worktree_dir")
 
   # Commit any uncommitted changes so worktree removal succeeds
   if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
@@ -177,9 +190,11 @@ cmd_abandon() {
     git commit -m "WIP: abandoning worktree"
   fi
 
-  # Go back to main repo and remove worktree
+  # Go back to main repo and remove worktree by its absolute path (so slashed
+  # branch names that nest the worktree dir are handled correctly)
   cd "$MAIN_REPO"
-  git worktree remove "tmp/worktrees/$worktree_name"
+  git worktree remove "$worktree_dir"
+  remove_empty_worktree_parent "$worktree_dir"
 
   # Delete the branch locally
   git branch -D "$branch"

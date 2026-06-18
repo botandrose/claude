@@ -29,8 +29,10 @@ Spawn parallel Claude Code instances, each in its own worktree, from a directory
 3. **For each markdown file**:
 
    a. **Derive branch name** from filename:
+      - Use only the file's **basename** — drop the directory components that Glob returns in the path
       - Strip the `.md` extension
-      - Example: `add-authentication.md` → `add-authentication`
+      - Replace any remaining `/` or whitespace with `-` — branch names must never contain slashes, which nest the worktree directory and break path handling
+      - Example: `path/to/tasks/add-authentication.md` → `add-authentication`
 
    b. **Read the file contents**
 
