@@ -19,8 +19,7 @@ This file provides default guidance to Claude Code (claude.ai/code) across all p
 - Prefer editing existing files over creating new ones
 - Never create documentation files unless explicitly requested
 - Use TodoWrite tool for complex multi-step tasks
-- Never commit changes unless explicitly asked
-- When asked to commit, use single-line commit messages. NEVER add Co-Authored-By attribution
+- When committing, use single-line commit messages. NEVER add Co-Authored-By attribution
 - Never introduce trailing whitespace in a file
 - Prefer double quotes for strings unless single quotes are required
 
