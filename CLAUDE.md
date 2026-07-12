@@ -120,6 +120,8 @@ When debugging test failures on a branch:
 
 ## Testing with Cucumber
 
+**Reserve Cucumber for the happy main path.** It is heavy and slow, so it exists to prove user-visible behavior end-to-end — not to cover edge cases, error conditions, or internal-logic variations. Push those down to fast RSpec unit tests. When fixing an edge-case bug, a focused RSpec test on the affected method is the right coverage; do not reach for a Cucumber scenario. Prefer one Cucumber scenario for the main flow plus RSpec for the corners over many Cucumber scenarios.
+
 When running cucumber tests:
 - **NEVER run the full cucumber test suite** - it is extremely slow. Only run specific feature files relevant to the current work (e.g., `bundle exec cucumber features/specific.feature`)
 - **NEVER run a cucumber test without piping to an output file** - **ALWAYS** pipe output to a file first, so that you can grep it later. Ensure this file has a unique filename to avoid collisions with other Claude sessions
