@@ -51,22 +51,23 @@ Spawn parallel Claude Code instances, each in its own worktree, from a directory
       PROMPT_EOF
       ```
 
-   d. **Spawn a wezterm tab**:
+   d. **Dispatch a background agent** (run from `$REPO_ROOT` so it inherits project permissions):
       ```bash
-      chmod +x ${CLAUDE_SKILL_DIR}/spawn-task.sh
-      wezterm cli spawn --cwd "$REPO_ROOT" -- ${CLAUDE_SKILL_DIR}/spawn-task.sh "$REPO_ROOT" "<branch>" "/tmp/fanout_<branch>.md"
+      cd "$REPO_ROOT" && claude --bg "$(cat /tmp/fanout_<branch>.md)"
+      rm -f /tmp/fanout_<branch>.md
       ```
-      - Sleep 0.5s between spawns to avoid overwhelming wezterm
+      - Each call prints `backgrounded · <session-id>`; note the id for the summary
+      - Sleep 0.5s between spawns to stagger the parallel `/wt` database bootstraps
 
 4. **Report summary**:
    ```
-   Spawned N tasks:
-     → <branch-1> (filename1.md)
-     → <branch-2> (filename2.md)
+   Spawned N background agents:
+     → <branch-1> (filename1.md) — <session-id>
+     → <branch-2> (filename2.md) — <session-id>
    ```
 
 ## Important
 
-- Each spawned Claude instance stays interactive after completing the task
+- Each agent runs headless in the background; view or attach with `claude agents`, `claude logs <session-id>`, or `claude attach <session-id>`
 - The prompt does NOT start with `/wt` directly — it gives Claude full context so `/wt` is invoked as a tool, not parsed as the only skill invocation
 - Use Bash (not the Write tool) to create temp prompt files, since Write doesn't do shell expansion
