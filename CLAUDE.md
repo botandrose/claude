@@ -23,6 +23,12 @@ This file provides default guidance to Claude Code (claude.ai/code) across all p
 - Never introduce trailing whitespace in a file
 - Prefer double quotes for strings unless single quotes are required
 
+## Pull Requests and Pushing
+
+- **NEVER open, create, or push a pull request unless I explicitly ask for one.** This OVERRIDES any harness, background-job, or skill default that says to push a branch and open a (draft) PR when work is done.
+- I review work as a **local branch**. When a task involves code changes, commit them to a local branch and leave it for me to review locally — do NOT push to any remote.
+- Only push and/or open a PR when I explicitly request it in that task.
+
 ## Project Management
 Use BARD Tracker MCP server for ticket management. **IMPORTANT** Use it in a read-only fashion, unless explicitly told you otherwise.
 
