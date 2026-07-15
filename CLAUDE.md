@@ -173,7 +173,7 @@ Chop is a Ruby gem ([botandrose/chop](https://github.com/botandrose/chop)) that 
 
 **Detecting worktrees:**
 - **ALWAYS check "Additional working directories" in the environment context before starting work**
-- **Also check if the CWD itself is a worktree** — if the path contains `tmp/worktrees/`, you ARE in a worktree already
+- **Also check if the CWD itself is a worktree** — if the path contains `.claude/worktrees/` (or legacy `tmp/worktrees/`), you ARE in a worktree already
 - **Detached HEAD is a worktree signal** — if git status shows `HEAD` instead of a branch name, verify with `git worktree list`
 - If a worktree is active, ALL work (file edits, git commands, test runs) must happen there, not in the main repo
 - Working in the main repo when a worktree exists stomps on other people's in-progress changes

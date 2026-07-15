@@ -10,6 +10,18 @@ set -e
 # Use --git-common-dir to always resolve to the main repo, even from a worktree
 MAIN_REPO=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 
+# .claude/worktrees is the only root Claude Code enters without a permission-root
+# relocation prompt. Legacy tmp/worktrees stays readable until existing ones drain.
+WORKTREES_ROOT="$MAIN_REPO/.claude/worktrees"
+LEGACY_WORKTREES_ROOT="$MAIN_REPO/tmp/worktrees"
+
+in_worktrees_root() {
+  case "$1" in
+    "$WORKTREES_ROOT"/*|"$LEGACY_WORKTREES_ROOT"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Extract TEST_ENV_NUMBER from a branch name (1-2 digit prefix before first dash)
 parse_env_number() {
   echo "$1" | grep -oP '^\d{1,2}(?=-)' || true
@@ -45,11 +57,11 @@ short_name() {
 }
 
 # Remove the worktree's parent dir if a slashed branch nested it and it is now
-# empty. Never touches the tmp/worktrees root itself.
+# empty. Never touches a worktrees root itself.
 remove_empty_worktree_parent() {
   local parent
   parent=$(dirname "$1")
-  if [ "$parent" != "$MAIN_REPO/tmp/worktrees" ]; then
+  if [ "$parent" != "$WORKTREES_ROOT" ] && [ "$parent" != "$LEGACY_WORKTREES_ROOT" ]; then
     rmdir "$parent" 2>/dev/null || true
   fi
 }
@@ -85,10 +97,10 @@ cmd_create() {
   fi
 
   git show-ref --verify --quiet "refs/heads/$branch" || git branch "$branch" "${base:-HEAD}"
-  mkdir -p "$MAIN_REPO/tmp/worktrees"
-  git worktree add "$MAIN_REPO/tmp/worktrees/$dir" "$branch"
+  mkdir -p "$WORKTREES_ROOT"
+  git worktree add "$WORKTREES_ROOT/$dir" "$branch"
 
-  echo "WORKTREE_DIR=$MAIN_REPO/tmp/worktrees/$dir"
+  echo "WORKTREE_DIR=$WORKTREES_ROOT/$dir"
   echo "BRANCH=$branch"
   echo "TEST_ENV_NUMBER=$num"
 }
@@ -130,8 +142,8 @@ cmd_finish() {
   worktree_dir=$(pwd)
 
   # Verify we're in a worktree
-  if [[ "$worktree_dir" != */tmp/worktrees/* ]]; then
-    echo "Error: not inside a worktree (expected path containing tmp/worktrees/)" >&2
+  if ! in_worktrees_root "$worktree_dir"; then
+    echo "Error: not inside a worktree (expected path under $WORKTREES_ROOT)" >&2
     exit 1
   fi
 
@@ -176,8 +188,8 @@ cmd_abandon() {
   worktree_dir=$(pwd)
 
   # Verify we're in a worktree
-  if [[ "$worktree_dir" != */tmp/worktrees/* ]]; then
-    echo "Error: not inside a worktree (expected path containing tmp/worktrees/)" >&2
+  if ! in_worktrees_root "$worktree_dir"; then
+    echo "Error: not inside a worktree (expected path under $WORKTREES_ROOT)" >&2
     exit 1
   fi
 

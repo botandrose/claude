@@ -48,7 +48,7 @@ branch as needed. Only fall back to branching from master when the ticket names 
 ## What Happens
 
 1. Creates the git branch if it doesn't exist (based on `origin/<name>` when it exists)
-2. Creates worktree at `tmp/worktrees/<short-name>`
+2. Creates worktree at `.claude/worktrees/<short-name>`
 3. Sets `BUNDLE_GEMFILE` to reuse main repo's gems (no bundle install needed)
 4. Runs `bin/rake bootstrap` to set up database
 5. Switches Claude Code's working directory to the worktree
