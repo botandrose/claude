@@ -29,6 +29,11 @@ This file provides default guidance to Claude Code (claude.ai/code) across all p
 - I review work as a **local branch**. When a task involves code changes, commit them to a local branch and leave it for me to review locally — do NOT push to any remote.
 - Only push and/or open a PR when I explicitly request it in that task.
 
+## Releases and Version Bumps
+
+- **A version bump ALWAYS gets its own commit**, separate from the code changes it releases. Never bundle a bump into a fix or feature commit, even when it feels like one unit of work: commit the code change first, then the bump.
+- **Match the repo's historical release convention.** Before committing a bump, check `git log` for prior release commits and copy their message style and scope exactly. Botandrose gems use the message `release vX.Y.Z.` (lowercase, with trailing period), touching only `lib/<gem>/version.rb`.
+
 ## Project Management
 Use BARD Tracker MCP server for ticket management. **IMPORTANT** Use it in a read-only fashion, unless explicitly told you otherwise.
 
