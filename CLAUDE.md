@@ -12,6 +12,15 @@ This file provides default guidance to Claude Code (claude.ai/code) across all p
 - Present comprehensive review of all changes before implementation
 - Only make actual changes after explicit user approval of the plan
 
+## My Concurrent Edits
+
+I edit files while you are working. Any change you did not make yourself is mine.
+
+- **Never revert, undo, or "restore" my edits.** Treat them as the current statement of my intent, outranking whatever you had written there.
+- **Merge your work into mine**, not the other way round. If I renamed, consolidated, reworded, or restructured something, carry that shape forward into everything else you touch.
+- **If I made a small slip** (a typo, a stale name, a block accidentally dropped in a refactor), just fix it quietly as part of merging.
+- **If my change genuinely conflicts** with what you were asked to do, and you cannot honour both, stop and ask me. Do not silently pick one.
+
 ## General Guidelines
 
 - Be concise and direct in communication
