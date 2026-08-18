@@ -209,7 +209,8 @@ Chop is a Ruby gem ([botandrose/chop](https://github.com/botandrose/chop)) that 
 
 - Comments are rare and terse. Default to none. A reviewer skimming the code should see mostly code, not prose.
 - Only comment the "why" when it is non-obvious from the code (a surprising constraint, a workaround, a gotcha). Never comment "what" or "how" — the code already says that.
-- One terse line, not a paragraph. Never write multi-line explanatory blocks, restate the method's behavior, or include usage examples — that belongs in docs, not inline.
+- **Hard cap: one line.** A comment that needs a second line is not a comment — put it in the commit message. Never write multi-line explanatory blocks, restate the method's behavior, or include usage examples.
+- A comment above a method that explains what the method does is always wrong; the name does that. Only a surprising *why* earns a line.
 - If a comment just narrates the next line, delete it. When in doubt, leave it out.
 
 ## Rails Conventions
