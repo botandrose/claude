@@ -213,6 +213,11 @@ Chop is a Ruby gem ([botandrose/chop](https://github.com/botandrose/chop)) that 
 - A comment above a method that explains what the method does is always wrong; the name does that. Only a surprising *why* earns a line.
 - If a comment just narrates the next line, delete it. When in doubt, leave it out.
 
+## Constants
+
+- **Don't extract a value into a constant when it is used in only one place.** Inline it at the call site instead — a constant with a single reference just adds indirection.
+- A constant on a class is public API. Only promote a value to one when it is genuinely shared across files, and prefer keeping it private otherwise.
+
 ## Rails Conventions
 
 ### Migrations
