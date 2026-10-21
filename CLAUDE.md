@@ -233,10 +233,14 @@ Chop is a Ruby gem ([botandrose/chop](https://github.com/botandrose/chop)) that 
   - Use: `form_with model: @user do |form|`
   - Avoid: `form_with model: @user do |f|`
 - Prefer `expose` pattern over instance variables for controller-to-view data:
-  - Use: `expose :invoice, :credit_note` with private methods that memoize
+  - Use: `expose def invoice = @invoice ||= Invoice.find(params[:id])` — a private memoizing method, exposed as a helper
   - Avoid: `@invoice = Invoice.find(...)` in controller actions
   - Views should use bare identifiers like `invoice` instead of `@invoice`
-  - The `expose` method creates `attr_reader` and `helper_method` for each symbol
+  - `expose :foo` on an already-defined method only adds `helper_method`; on an undefined one it adds `attr_reader` too
+
+### Shared Behavior: Objects, Never Concerns
+- **Never extract shared behavior into a concern** (an `ActiveSupport::Concern` or any mixin module). Always extract an object instead.
+- Give the behavior a name as a collaborator the model holds and delegates to: an `ActiveRecord::AssociatedObject` via `has_object`, or a PORO that wraps the record.
 
 ## Configuration Precedence
 
