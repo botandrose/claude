@@ -23,7 +23,7 @@ fi
 ME_ID=$(curl -sf -H "$AUTH" "$API/me" | jq -r ".id")
 
 # The API's date predicates are UTC, so over-fetch and cut at local midnight.
-SINCE=$(date -u -d "today 00:00" +%Y-%m-%dT%H:%M:%SZ)
+SINCE=$(date -u -d "@$(date -d 'today 00:00' +%s)" +%Y-%m-%dT%H:%M:%SZ)
 FETCH_AFTER=$(date -d "2 days ago" +%F)
 
 curl -sf -G -H "$AUTH" "$API/projects/$PROJECT_ID/tickets" \
